@@ -1,0 +1,198 @@
+---
+title: "Nightingale data analysis for Q3 2018"
+author: "Zella King"
+date: "16/10/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+users_to_ignore<-c(24597,24670,24671,24674,24633,24632,24788)
+
+library(lubridate)
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(knitr)
+
+wd<-getwd()
+date_string<-ymd(substring(wd,nchar(wd)-5,nchar(wd)))
+```
+
+## About this document
+
+This report has been prepared for White Swan. It is an analysis of the data produced for Project Nightingale by the UMotif app, based on a download taken on `r date_string`. 
+
+```{r reading_processing_data, include=FALSE, echo=FALSE, cache=TRUE}
+registered_users<-read.csv("output_registered_users.csv", stringsAsFactors = FALSE)
+activity<-read.csv("output_activity.csv", stringsAsFactors = FALSE)
+symptom_data<-read.csv("output_symptom_data.csv", stringsAsFactors = FALSE)
+user_date_binaryandvaluedsymptoms<-read.csv("output_user_date_binaryandvaluedsymptoms.csv", stringsAsFactors = FALSE)
+flaresonly_user_date_duration<-read.csv("output_flaresonly_user_date_duration.csv", stringsAsFactors = FALSE)
+```
+
+
+## 1. Number of user registrations
+
+The total number of unique users who have registered for the app, excluding six project insiders, is `r length(unique(c(unique(symptom_data$UserId),unique(registered_users$userid))))`.
+
+The chart below shows the number of registrations per day from `r ymd(min(registered_users$EntryDateYMD))`, the date the app was launched, up to `r date_string`. 
+
+
+```{r registrations, echo=FALSE}
+p<-ggplot(registered_users,aes(as.Date(EntryDateYMD)))
+p<-p + geom_histogram(binwidth = 1) 
+p<-p + xlab("Date of registration") 
+p<-p + ylab("Number of registrations on this day")
+p<-p +  labs(title="Figure 1a: Number of registrations per day")
+p
+```
+
+
+## 2. Attached devices
+
+```{r user_activity_table, echo=FALSE}
+activity_by_user<-group_by(activity,UserId)
+user_activity_table<-as.data.table(summarize(activity_by_user, Number = n(), Steps = round(mean(Steps, na.rm = T),0), Distance = round(mean(Distance, na.rm = T),0), Sleep = round(mean(Sleep, na.rm = T),0)))
+#colnames(user_activity_table)<-c("User ID","Number of activity entries","Mean steps","Mean distance","Mean sleep")
+
+activity_by_device_by_user<-group_by(activity,UserId, Source)
+user_device_activity_table<-as.data.table(summarize(activity_by_device_by_user, Number = n(), Steps = round(mean(Steps, na.rm = T),0), Distance = round(mean(Distance, na.rm = T),0), Sleep = round(mean(Sleep, na.rm = T),0)))
+```
+
+The number of users who have attached a device is `r nrow(user_activity_table)` and between them they have `r nrow(user_device_activity_table)` devices, an average of `r round(nrow(user_device_activity_table)/nrow(user_activity_table),1)` devices per user. Some devices, shown as NA, are not identified. 
+
+```{r device_types, echo=FALSE}
+#device_sum <- as.data.frame(user_device_activity_table[, sum(UserId), by = list(Source)])
+device_sum<-as.data.frame(summarize(group_by(user_device_activity_table,Source),n()))
+device_sum[1,1]<-"NA"
+colnames(device_sum)<-c("Device type", "Number of devices attached")
+kable(device_sum)
+```
+
+
+## 3. Number of users regularly using uMotif
+
+
+```{r usage_rates, echo=FALSE}
+user_date_symptom_sum<-data.table(summarize(group_by(user_date_binaryandvaluedsymptoms,UserId,EntryDateYMD),n()))
+user_symptom_sum<-data.table(summarize(group_by(user_date_symptom_sum,UserId),n()))
+
+user_symptom_sum<-data.table(summarize(group_by(user_date_symptom_sum,UserId),Num_dates_symptom_data= n(), First_symptom_date = min(as.Date(EntryDateYMD)), Last_symptom_date = max(as.Date(EntryDateYMD))))
+user_symptom_sum[, date_diff := Last_symptom_date - First_symptom_date]
+
+#calculate the proportion of dates with symptom data
+user_symptom_sum[, frequency := Num_dates_symptom_data/(as.numeric(date_diff) + 1)] #add one because user can enter symptom date on first and last dates
+
+#decide which users are active - we are assuming they have to enter symptoms on 5 of every 7 days since they started using the app
+user_symptom_sum[, active := frequency>=5/7]
+user_symptom_sum[, active_this_week := Last_symptom_date>=date_string -  7]
+user_symptom_sum[, active_this_month := Last_symptom_date>=date_string -  28]
+
+```
+
+Although `r length(unique(c(unique(symptom_data$UserId),unique(registered_users$userid))))` unique user IDs exist on UMotif, data is not complete for all of these, as some have no symptom data. Excluding those with missing data leaves `r nrow(user_symptom_sum)` users. 
+
+Not all users enter symptoms every day. We can define an active user in different ways: 
+
+Have entered symptom data in the last 4 weeks: `r sum(user_symptom_sum$active_this_month)`  
+Have entered symptom data in the last week: `r sum(user_symptom_sum$active_this_week)`  
+Have entered symptom data at least 5 days each week during the time they have been using the app: `r sum(user_symptom_sum$active)`  
+
+
+## 4. Activity analysis
+
+The following charts show descriptive statistics for activity data (sleep, steps and distance). Where a user has attached more than one device, activity data (sleep, steps and distance) has been averaged across all the devices they attached which provided data on that day. 
+
+The charts show the distribution by months as a box-and-whisker chart. The median (middle quartile) marks the mid-point of the data and is shown by the line that divides the box into two parts. Half the scores are greater than or equal to this value and half are less. The pink “box” represents the middle 50% of scores for the group. The upper and lower whiskers represent scores outside the middle 50%. The width of the box represents the number of observations that month. There is little data for October so far, hence the narrow box for month 10. The median of zero may be due to few devices having synced their data so far this month.
+
+
+### Steps
+
+The mean number of steps is `r round(mean(activity_by_user$Steps, na.rm = T),0)` per day across all days of data and users. The median is `r round(median(activity_by_user$Steps, na.rm = T),0)` 
+
+```{r steps_chart, echo=FALSE, warning=FALSE}
+p<-ggplot(activity_by_user,aes(x = as.factor(month(EntryDateYMD)), y = Steps))
+p<-p+geom_boxplot(varwidth=T, outlier.colour="black", outlier.shape=16, outlier.size=2, notch=FALSE, fill="plum") 
+p<-p +  labs(title="Figure 3a: Steps by month", 
+         x="Month of year",
+         y="Number of steps per day")
+p
+```
+
+### Distance
+
+The mean distance covered per day is `r round(mean(activity_by_user$Distance/1000, na.rm = T),2)` km and the median is `r round(median(activity_by_user$Distance/1000, na.rm = T),2)`. The chart below shows the distribution by month Clearly, there are some extreme distances covered.  
+
+```{r distance_chart, echo=FALSE, warning=FALSE}
+p<-ggplot(activity_by_user,aes(x = as.factor(month(EntryDateYMD)), y = Distance/1000))
+p<-p+geom_boxplot(varwidth=T, outlier.colour="black", outlier.shape=16, outlier.size=2, notch=FALSE, fill="plum") 
+p<-p +  labs(title="Figure 3c: Distance by month", 
+         x="Month of year",
+         y="Distance travelled per day (km)")
+p
+```
+
+
+### Sleep
+
+The mean number of minutes of sleep per night is `r round(mean(activity_by_user$Sleep, na.rm = T),0)` minutes or `r round(mean(activity_by_user$Sleep/60, na.rm = T),1)` hours and the median is `r round(median(activity_by_user$Sleep, na.rm = T),0)` minutes or `r round(median(activity_by_user$Sleep/60, na.rm = T),1)` hours. The chart below shows the distribution by month 
+
+```{r sleep_chart, echo=FALSE, warning=FALSE}
+p<-ggplot(activity_by_user,aes(x = as.factor(month(EntryDateYMD)), y = Sleep))
+p<-p+geom_boxplot(varwidth=T, outlier.colour="black", outlier.shape=16, outlier.size=2, notch=FALSE, fill="plum") 
+p<-p +  labs(title="Figure 3e: Minutes of sleep per night by month", 
+         x="Month of year",
+         y="Number of minutes of sleep per night")
+p
+```
+
+
+
+## 5. Flare analysis
+
+```{r user_flare_data_calc, echo=FALSE}
+flare_by_user<-group_by(flaresonly_user_date_duration,UserID)
+user_flare_data_table<-as.data.table(summarize(flare_by_user, Number = n()))
+```
+
+In total `r nrow(user_flare_data_table)` users reported flare symptoms on at least one day. This chart shows how many days of flare data each user provided so far, ranging from 1 to `r max(user_flare_data_table$Number)` days. 
+
+```{r user_flare_data_chart, echo=FALSE}
+p<-ggplot(user_flare_data_table,aes(Number))
+p<-p + geom_histogram(binwidth = 1) 
+p<-p + xlab("Number of days of flare sympton recorded by user") 
+p<-p + ylab("Number of users")
+p<-p +  labs(title="Figure 4a: No. days flare data provided by user")
+p
+```
+
+### Flare duration
+
+Flare duration is difficult to calculate as we don't have complete data for each patient every day. It was calculated by taking as start date any day where a patient reported a flare, and counting the number of days of complete data where the flare continued. Note that if the patient had incomplete data with days of flare symptoms missing, the last day in a continuous sequence was deemed to be the last day of the flare. It's possible of course that the flare continued afterward, but the patient did not report this. 
+The median flare length was `r median(flaresonly_user_date_duration$Duration)` and the mean was `r round(mean(flaresonly_user_date_duration$Duration),1)`
+
+The table below shows how the mean and standard deviation in flare duration varied each week for which we have data. (The week is the week in which the flare started and the duration is measured in days.) 
+
+#### Flare duration by week
+
+```{r flare_duration_table, echo=FALSE}
+flare_by_week<-group_by(flaresonly_user_date_duration,as.factor(week(EntryDateYMD)))
+flare_table<-as.data.table(summarize(flare_by_week, Number = n(), Mean = round(mean(Duration, na.rm = T),1), Median = round(median(Duration, na.rm = T),1)))
+colnames(flare_table)<-c("Week number","No of flares in  week","Mean duration", "Median duration")
+kable(flare_table, caption = "Figure 4c: Flare duration by week")
+#print(flare_table,row.names = FALSE)
+```
+
+The chart below shows the same information as a box plot. 
+
+
+```{r flare_duration_chart, echo=FALSE}
+p<-ggplot(flaresonly_user_date_duration,aes(x = as.factor(week(EntryDateYMD)), y = Duration))
+p<-p+geom_boxplot(varwidth=T, outlier.colour="black", outlier.shape=16, outlier.size=2, notch=FALSE, fill="plum") 
+p<-p +  labs(title="Figure 4d: Flare duration by week", 
+         x="Week of year",
+         y="Flare Duration (days)")
+p
+```
+
