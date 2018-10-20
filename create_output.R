@@ -1,3 +1,6 @@
+## The purpose of this file is to clean data exported from the UMotif app
+## You need to save this file in a directory into which the exported data has been unzipped
+## The directory must be called "all-data yymmdd" where yymmdd is the export date
 
 users_to_ignore<-c(24597,24670,24671,24674,24633,24632,24788)
 
@@ -5,6 +8,7 @@ library(data.table)
 library(dplyr)
 library(lubridate)
 
+#get the export date from the directory name
 wd<-getwd()
 date_string<-ymd(substring(wd,nchar(wd)-5,nchar(wd)))
 

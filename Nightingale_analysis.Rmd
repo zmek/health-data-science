@@ -1,7 +1,7 @@
 ---
-title: "Nightingale data analysis for Q3 2018"
+title: "Nightingale data analysis for White Swan"
 author: "Zella King"
-date: "16/10/2018"
+date: "19/10/2018"
 output: html_document
 ---
 
@@ -114,7 +114,7 @@ The mean number of steps is `r round(mean(activity_by_user$Steps, na.rm = T),0)`
 ```{r steps_chart, echo=FALSE, warning=FALSE}
 p<-ggplot(activity_by_user,aes(x = as.factor(month(EntryDateYMD)), y = Steps))
 p<-p+geom_boxplot(varwidth=T, outlier.colour="black", outlier.shape=16, outlier.size=2, notch=FALSE, fill="plum") 
-p<-p +  labs(title="Figure 3a: Steps by month", 
+p<-p +  labs(title="Figure 4a: Steps by month", 
          x="Month of year",
          y="Number of steps per day")
 p
@@ -127,7 +127,7 @@ The mean distance covered per day is `r round(mean(activity_by_user$Distance/100
 ```{r distance_chart, echo=FALSE, warning=FALSE}
 p<-ggplot(activity_by_user,aes(x = as.factor(month(EntryDateYMD)), y = Distance/1000))
 p<-p+geom_boxplot(varwidth=T, outlier.colour="black", outlier.shape=16, outlier.size=2, notch=FALSE, fill="plum") 
-p<-p +  labs(title="Figure 3c: Distance by month", 
+p<-p +  labs(title="Figure 4b: Distance by month", 
          x="Month of year",
          y="Distance travelled per day (km)")
 p
@@ -141,7 +141,7 @@ The mean number of minutes of sleep per night is `r round(mean(activity_by_user$
 ```{r sleep_chart, echo=FALSE, warning=FALSE}
 p<-ggplot(activity_by_user,aes(x = as.factor(month(EntryDateYMD)), y = Sleep))
 p<-p+geom_boxplot(varwidth=T, outlier.colour="black", outlier.shape=16, outlier.size=2, notch=FALSE, fill="plum") 
-p<-p +  labs(title="Figure 3e: Minutes of sleep per night by month", 
+p<-p +  labs(title="Figure 4c: Minutes of sleep per night by month", 
          x="Month of year",
          y="Number of minutes of sleep per night")
 p
@@ -163,7 +163,7 @@ p<-ggplot(user_flare_data_table,aes(Number))
 p<-p + geom_histogram(binwidth = 1) 
 p<-p + xlab("Number of days of flare sympton recorded by user") 
 p<-p + ylab("Number of users")
-p<-p +  labs(title="Figure 4a: No. days flare data provided by user")
+p<-p +  labs(title="Figure 5a: No. days flare data provided by user")
 p
 ```
 
@@ -180,8 +180,7 @@ The table below shows how the mean and standard deviation in flare duration vari
 flare_by_week<-group_by(flaresonly_user_date_duration,as.factor(week(EntryDateYMD)))
 flare_table<-as.data.table(summarize(flare_by_week, Number = n(), Mean = round(mean(Duration, na.rm = T),1), Median = round(median(Duration, na.rm = T),1)))
 colnames(flare_table)<-c("Week number","No of flares in  week","Mean duration", "Median duration")
-kable(flare_table, caption = "Figure 4c: Flare duration by week")
-#print(flare_table,row.names = FALSE)
+kable(flare_table, caption = "Figure 5b: Flare duration by week")
 ```
 
 The chart below shows the same information as a box plot. 
@@ -190,9 +189,80 @@ The chart below shows the same information as a box plot.
 ```{r flare_duration_chart, echo=FALSE}
 p<-ggplot(flaresonly_user_date_duration,aes(x = as.factor(week(EntryDateYMD)), y = Duration))
 p<-p+geom_boxplot(varwidth=T, outlier.colour="black", outlier.shape=16, outlier.size=2, notch=FALSE, fill="plum") 
-p<-p +  labs(title="Figure 4d: Flare duration by week", 
+p<-p +  labs(title="Figure 5c: Flare duration by week", 
          x="Week of year",
          y="Flare Duration (days)")
 p
 ```
+
+
+## 6. Complete user records
+
+```{r complete_data, echo=FALSE}
+##counting number of activity rows per user per date
+activity<-data.table(activity)
+user_date_countofactivityrows <- activity[, list(sum(Steps),sum(Distance),sum(Duration),sum(Sleep),sum(Calories)), 
+                                          by = list(UserId,EntryDateYMD)]
+user_date_countofactivityrows$V1<-as.numeric(user_date_countofactivityrows$V1>0)
+user_date_countofactivityrows$V2<-as.numeric(user_date_countofactivityrows$V2>0)
+user_date_countofactivityrows$V3<-as.numeric(user_date_countofactivityrows$V3>0)
+user_date_countofactivityrows$V4<-as.numeric(user_date_countofactivityrows$V4>0)
+user_date_countofactivityrows$V5<-as.numeric(user_date_countofactivityrows$V5>0)
+
+##counting total number of activity rows per user (all dates)
+user_countofactivityrows<-user_date_countofactivityrows[, list(sum(V1),sum(V2),sum(V3),sum(V4),sum(V5)), 
+                                                        by = list(UserId)]
+rm(user_date_countofactivityrows)
+colnames(user_countofactivityrows)<-c("UserId","Steps","Distance","Duration","Sleep","Calories")
+
+
+##counting number of dates with symptoms per user
+user_date_binaryandvaluedsymptoms<-data.table(user_date_binaryandvaluedsymptoms)
+user_date_binaryandvaluedsymptoms[, symptom_provided := 1]
+
+#create a table with a unique row for each user and date
+user_date_countofsymptomrows <- user_date_binaryandvaluedsymptoms[, sum(symptom_provided), by = list(UserId,EntryDateYMD)]
+
+#reduce that to count of symptom rows across all dates
+user_countofsymptomrows <- user_date_countofsymptomrows[, sum(V1), by = list(UserId)]
+colnames(user_countofsymptomrows)<-c("UserID","Count of symptom rows")
+rm(user_date_countofsymptomrows)
+
+#do the same for flare rows only
+user_date_flaresymptoms<-user_date_binaryandvaluedsymptoms[SegmentCategoryId == 610]
+user_countofflarerows <- user_date_flaresymptoms[, sum(symptom_provided), by = list(UserId)]
+colnames(user_countofflarerows)<-c("UserID","Count of flare rows")
+rm(user_date_flaresymptoms)
+
+#merge these 3 tables together
+setkey(user_countofactivityrows,UserId)
+setkey(user_countofsymptomrows,UserID)
+setkey(user_countofflarerows,UserID)
+
+merged <-  user_countofactivityrows[user_countofsymptomrows, ]
+merged$gt50symptomrows<-merged$`Count of symptom rows`>50*9
+merged$gt50steprows<-merged$Steps>50
+a<-is.na(merged$gt50steprows)
+merged$gt50steprows[a == 1]<-0
+merged$gt50steprows<-as.logical(merged$gt50steprows)
+
+merged2<-user_countofflarerows[merged,]
+merged2$gt50flarerows<-merged2$`Count of flare rows`>50
+a<-is.na(merged2$gt50flarerows)
+merged2$gt50flarerows[a == 1]<-0
+merged2$gt50flarerows<-as.logical(merged2$gt50flarerows)
+
+#Create a table showing how many users have both >50 flare rows and >50 step rows
+a<-addmargins(table(merged2$gt50steprows,merged2$gt50flarerows))
+colnames(a)<-c("Patients with <50 days of flare data","Patients with >50 days of flare data","Total no. of patients")
+row.names(a)<-c("Patients with <50 days of step data","Patients with >50 days of step data","Total")
+```
+
+A crucial question for further analysis of the relationship between symptoms, activity (captured by devices)  and flares is the number of patients who have provided enough flare symptom data to be confident that we know when their flares occured and that we have enough consistent data to do longitudinal analysis. Ideally they would have activity from devices too. The table indicates the number of users with more than 50 days of flare symptoms, and those with more than 50 days of steps data. It shows that `r a[2,2]` users have more than 50 days of both. 
+
+```{r complete_data_Table, echo=FALSE}
+kable(a, caption = "Figure 6: Patients with more than 50 days of data")
+
+```
+
 
