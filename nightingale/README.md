@@ -1,15 +1,19 @@
-# About this folder
+# About this project
 
-This folder contains files that can be used to analyse the data extracted from the UMotif app for White Swan's Nightingale project. 
+This folder contains files that can be used to analyse symptom data recorded by sufferers of ankylosing spondylitis. They recorded their symptoms using the UMotif app which was whitelabelled for White Swan's [Nightingale project](https://whiteswan.org.uk/portfolio/nightingale-holistic-disease-monitoring/). A Consultant at the Royal National Hospital for Rheumatic Diseases wanted to understand how data from wearable devices could be utilised to better understand factors impacting the severity of different symptoms to improve and personalise treatment, thereby empowering ankylosing spondylitis patients to optimise self-management.
 
-Separately, you need to have access to an export of Nightingale data. Once you have that:
+I helped the Consultant analyse the data over a six month period during 2018. 
+
+## Instructions for extracting the data
+
+The code here requires access to an export of UMotif data. Once you have that:
 
 - Unzip the data export from UMotif into a directory which is named "all-data yymmdd"" (where yymmdd is the date of the export)
 - Copy the files in this repo into that directory
 
-Note: currently the programmes read the directory name to find out what the export date is, thus it is important that you follow the naming convention mentioned above, or rewrite the code.
+Note: currently the programmes read the directory name to find out what the export date is, thus it is important to follow the naming convention mentioned above, or rewrite the code.
 
-# About the symptoms recorded by UMotif
+## About the symptoms recorded by UMotif
 
 In this repo, the file called "symptom_labels.csv"" gives you the numeric code for each symptom recorded by the app, and the text that the user sees. This text is translated into a numeric value from 1 to 5. 
 
@@ -21,14 +25,14 @@ Note that many users have gaps in their recording of symptoms - ie days with no 
 
 Certain user IDs are associated with project insiders. These include UserIDs 24597, 24670, 24671, 24674, 24633, 24632 and 24788. These are included in a string called users_to_ignore
 
-# About the programmes
+## About the programmes
 
 | Programme | Description |
 | ------ | ------ |
 | create_output 2.R | Run this to clean up the input files. It will create five output files in the same directory. These are detailed below.  |
 | Nightingale_analysis.Rmd | This is a mark down file which will create a short report detailing user registrations, attached devices, number of regular users, and some boxplots by month showing steps, distance and sleep. Run this once the programme mentioned above has created the output files. |
 
-# About the files created by create_output.R
+## About the files created by create_output.R
 
 | File | Description |
 | ------ | ------ |
